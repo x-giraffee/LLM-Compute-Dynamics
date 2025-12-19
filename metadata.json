@@ -1,0 +1,5 @@
+{
+  "name": "LLM Training vs Inference Simulator",
+  "description": "An interactive dashboard visualizing the differences between Large Language Model training and inference, focusing on GPU resource allocation, data flow, and weight updates.",
+  "requestFramePermissions": []
+}
