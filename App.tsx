@@ -2,11 +2,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GpuDashboard from './components/GpuDashboard';
 import NeuralNetVis from './components/NeuralNetVis';
-import { SimulationMode, GpuMetrics, LogEntry } from './types';
-import { GPU_SPECS, TRAINING_DEFAULTS, INFERENCE_DEFAULTS } from './constants';
+import { SimulationMode, GpuMetrics, LogEntry, Language } from './types';
+import { GPU_SPECS, TRAINING_DEFAULTS, INFERENCE_DEFAULTS, TRANSLATIONS } from './constants';
 import { getSimulationAnalysis, getComparisonExpertView } from './services/geminiService';
 
-const LLM_VOCAB = ["The", "model", "is", "thinking", "about", "how", "to", "process", "large", "amounts", "of", "data", "efficiently", "on", "a", "GPU", "cluster", "running", "H100", "units"];
+const LLM_VOCAB_EN = ["The", "model", "is", "thinking", "about", "how", "to", "process", "large", "amounts", "of", "data", "efficiently", "on", "a", "GPU", "cluster", "running", "H100", "units"];
+const LLM_VOCAB_ZH = ["模型", "正在", "思考", "如何", "高效", "处理", "大量", "数据", "在", "运行", "H100", "单元", "的", "GPU", "集群", "上"];
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<SimulationMode>(SimulationMode.IDLE);
@@ -14,7 +15,10 @@ const App: React.FC = () => {
   const [metricsHistory, setMetricsHistory] = useState<GpuMetrics[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [step, setStep] = useState(0);
-  const [expertTip, setExpertTip] = useState<string>('Select a task to begin monitoring the neural fabric.');
+  const [lang, setLang] = useState<Language>('en');
+  
+  const t = TRANSLATIONS[lang];
+  const [expertTip, setExpertTip] = useState<string>(t.tipDefault);
   
   // Token Display State
   const [inputTokens, setInputTokens] = useState<string[]>([]);
@@ -22,6 +26,13 @@ const App: React.FC = () => {
   
   const metricsTimerRef = useRef<number | null>(null);
   const taskTimerRef = useRef<number | null>(null);
+
+  // Update expert tip default when lang changes if in idle
+  useEffect(() => {
+    if (mode === SimulationMode.IDLE) {
+      setExpertTip(TRANSLATIONS[lang].tipDefault);
+    }
+  }, [lang, mode]);
 
   const addLog = (message: string, level: LogEntry['level'] = 'INFO') => {
     const newLog: LogEntry = {
@@ -81,22 +92,24 @@ const App: React.FC = () => {
         if (step >= 20) {
           setMode(SimulationMode.IDLE);
           setIsPaused(false);
-          addLog(`${mode} sequence completed successfully.`, 'SUCCESS');
+          addLog(mode + " " + t.consoleSuccess, 'SUCCESS');
           return;
         }
 
         const nextStep = step + 1;
         setStep(nextStep);
         
+        const vocab = lang === 'zh' ? LLM_VOCAB_ZH : LLM_VOCAB_EN;
+
         // Update Token Visuals
         if (mode === SimulationMode.INFERENCE) {
-          setOutputTokens(prev => [...prev, LLM_VOCAB[nextStep % LLM_VOCAB.length]].slice(-5));
+          setOutputTokens(prev => [...prev, vocab[nextStep % vocab.length]].slice(-5));
         } else if (mode === SimulationMode.TRAINING) {
           // Training consumes "batches" of tokens
-          setInputTokens(Array.from({length: 8}, () => LLM_VOCAB[Math.floor(Math.random() * LLM_VOCAB.length)]));
+          setInputTokens(Array.from({length: 8}, () => vocab[Math.floor(Math.random() * vocab.length)]));
         }
 
-        const logMsg = await getSimulationAnalysis(mode as any, nextStep);
+        const logMsg = await getSimulationAnalysis(mode as any, nextStep, lang);
         addLog(logMsg);
       }, 1500);
     }
@@ -104,7 +117,7 @@ const App: React.FC = () => {
     return () => {
       if (taskTimerRef.current) clearTimeout(taskTimerRef.current);
     };
-  }, [mode, isPaused, step]);
+  }, [mode, isPaused, step, lang, t]);
 
   const handleStartTask = async (task: SimulationMode) => {
     if (mode !== SimulationMode.IDLE) return;
@@ -114,15 +127,20 @@ const App: React.FC = () => {
     setIsPaused(false);
     setOutputTokens([]);
     
+    const vocab = lang === 'zh' ? LLM_VOCAB_ZH : LLM_VOCAB_EN;
+    
     if (task === SimulationMode.INFERENCE) {
-      setInputTokens(["What", "is", "a", "GPU", "H100", "for?"]);
+      const promptTokens = lang === 'zh' 
+        ? ["GPU", "H100", "是", "用来", "做什么", "的", "?"] 
+        : ["What", "is", "a", "GPU", "H100", "for?"];
+      setInputTokens(promptTokens);
     } else {
-      setInputTokens(Array.from({length: 8}, () => LLM_VOCAB[Math.floor(Math.random() * LLM_VOCAB.length)]));
+      setInputTokens(Array.from({length: 8}, () => vocab[Math.floor(Math.random() * vocab.length)]));
     }
 
-    addLog(`Initiating ${task} sequence...`, 'INFO');
+    addLog(t.consoleInit, 'INFO');
     
-    const tip = await getComparisonExpertView(task === SimulationMode.TRAINING);
+    const tip = await getComparisonExpertView(task === SimulationMode.TRAINING, lang);
     setExpertTip(tip);
   };
 
@@ -130,11 +148,11 @@ const App: React.FC = () => {
     if (mode === SimulationMode.IDLE) return;
     const nextPaused = !isPaused;
     setIsPaused(nextPaused);
-    addLog(nextPaused ? "Simulation paused by user." : "Simulation resumed.", nextPaused ? 'WARN' : 'INFO');
+    addLog(nextPaused ? t.consolePause : t.consoleResume, nextPaused ? 'WARN' : 'INFO');
   };
 
   const handleStopTask = () => {
-    addLog(`Task '${mode}' terminated by user. Returning to IDLE state.`, 'WARN');
+    addLog(t.consoleStop + " " + t.consoleBackToIdle, 'WARN');
     setMode(SimulationMode.IDLE);
     setIsPaused(false);
     setStep(0);
@@ -155,53 +173,63 @@ const App: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
               </svg>
             </span>
-            LLM Compute Dynamics
+            {t.appTitle}
           </h1>
           <p className="text-slate-400 mt-2 max-w-xl text-sm md:text-base">
-            Observe how Training (Forward + Backward pass) and Inference (Autoregressive Token Generation) 
-            differ in hardware utilization and data flow.
+            {t.appDesc}
           </p>
         </div>
         
-        <div className="flex gap-3">
-          {mode === SimulationMode.IDLE ? (
-            <>
-              <button 
-                onClick={() => handleStartTask(SimulationMode.TRAINING)}
-                className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/20 bg-blue-600 hover:bg-blue-500 text-white"
-              >
-                Start Training Run
-              </button>
-              <button 
-                onClick={() => handleStartTask(SimulationMode.INFERENCE)}
-                className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-emerald-900/20 bg-emerald-600 hover:bg-emerald-500 text-white"
-              >
-                Run Inference Task
-              </button>
-            </>
-          ) : (
-            <div className="flex gap-2">
-              <button 
-                onClick={togglePause}
-                className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center gap-2 ${
-                  isPaused 
-                    ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20' 
-                    : 'bg-slate-700 hover:bg-slate-600 text-slate-100 shadow-slate-900/20'
-                }`}
-              >
-                {isPaused ? "Resume" : "Pause"}
-              </button>
-              
-              {isPaused && (
-                <button 
-                  onClick={handleStopTask}
-                  className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg bg-red-900/40 hover:bg-red-800/60 text-red-200 border border-red-500/30"
-                >
-                  Stop Task
-                </button>
+        <div className="flex flex-col items-end gap-3">
+            <button
+              onClick={() => setLang(prev => prev === 'en' ? 'zh' : 'en')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors"
+            >
+              <span className={lang === 'en' ? 'text-white font-bold' : 'text-slate-500'}>EN</span>
+              <span className="w-px h-3 bg-slate-600"></span>
+              <span className={lang === 'zh' ? 'text-white font-bold' : 'text-slate-500'}>中文</span>
+            </button>
+            
+            <div className="flex gap-3">
+              {mode === SimulationMode.IDLE ? (
+                <>
+                  <button 
+                    onClick={() => handleStartTask(SimulationMode.TRAINING)}
+                    className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-blue-900/20 bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    {t.btnTraining}
+                  </button>
+                  <button 
+                    onClick={() => handleStartTask(SimulationMode.INFERENCE)}
+                    className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg shadow-emerald-900/20 bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {t.btnInference}
+                  </button>
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <button 
+                    onClick={togglePause}
+                    className={`px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center gap-2 ${
+                      isPaused 
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20' 
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-100 shadow-slate-900/20'
+                    }`}
+                  >
+                    {isPaused ? t.btnResume : t.btnPause}
+                  </button>
+                  
+                  {isPaused && (
+                    <button 
+                      onClick={handleStopTask}
+                      className="px-6 py-2.5 rounded-lg font-semibold transition-all shadow-lg bg-red-900/40 hover:bg-red-800/60 text-red-200 border border-red-500/30"
+                    >
+                      {t.btnStop}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
         </div>
       </header>
 
@@ -213,23 +241,24 @@ const App: React.FC = () => {
             isPaused={isPaused} 
             inputTokens={inputTokens} 
             outputTokens={outputTokens} 
+            lang={lang}
           />
           
-          <GpuDashboard history={metricsHistory} current={currentMetrics} mode={mode} />
+          <GpuDashboard history={metricsHistory} current={currentMetrics} mode={mode} lang={lang} />
 
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
             {[
-              { label: 'GPU Temp', value: `${currentMetrics.temperature.toFixed(1)}°C`, color: 'text-orange-400' },
-              { label: 'TFLOPS', value: `${currentMetrics.tflops.toFixed(1)}`, color: 'text-purple-400' },
-              { label: mode === SimulationMode.INFERENCE ? 'Current Generation' : 'Training Progress', value: `#${step}`, color: 'text-yellow-400' },
+              { label: t.statTemp, value: `${currentMetrics.temperature.toFixed(1)}°C`, color: 'text-orange-400' },
+              { label: t.statTflops, value: `${currentMetrics.tflops.toFixed(1)}`, color: 'text-purple-400' },
+              { label: mode === SimulationMode.INFERENCE ? t.statToken : t.statStep, value: `#${step}`, color: 'text-yellow-400' },
               { 
-                label: mode === SimulationMode.INFERENCE ? 'Tokens/Sec' : (mode === SimulationMode.TRAINING ? 'Loss Value' : 'Idle Status'), 
+                label: mode === SimulationMode.INFERENCE ? t.statTps : (mode === SimulationMode.TRAINING ? t.statLoss : t.statStatus), 
                 value: mode === SimulationMode.INFERENCE 
                   ? `${currentMetrics.tps?.toFixed(1) || '0.0'}` 
-                  : (mode === SimulationMode.TRAINING ? `${currentMetrics.loss?.toFixed(4) || '0.0000'}` : 'READY'), 
+                  : (mode === SimulationMode.TRAINING ? `${currentMetrics.loss?.toFixed(4) || '0.0000'}` : t.statusReady), 
                 color: mode === SimulationMode.INFERENCE ? 'text-amber-400' : (mode === SimulationMode.TRAINING ? 'text-rose-400' : 'text-slate-500') 
               },
-              { label: 'Status', value: mode === SimulationMode.IDLE ? 'IDLE' : (isPaused ? 'PAUSED' : 'ACTIVE'), color: isPaused ? 'text-amber-400' : (mode === SimulationMode.IDLE ? 'text-slate-500' : 'text-emerald-400') },
+              { label: t.statStatus, value: mode === SimulationMode.IDLE ? t.statusIdle : (isPaused ? t.statusPaused : t.statusActive), color: isPaused ? 'text-amber-400' : (mode === SimulationMode.IDLE ? 'text-slate-500' : 'text-emerald-400') },
             ].map((stat, i) => (
               <div key={i} className="bg-slate-800/30 border border-slate-700 p-4 rounded-xl">
                 <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest mb-1 truncate">{stat.label}</p>
@@ -243,7 +272,7 @@ const App: React.FC = () => {
           <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-xl p-6 shadow-inner relative overflow-hidden">
             <h3 className="text-indigo-300 font-bold mb-3 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-              Architect's Analysis
+              {t.secAnalysis}
             </h3>
             <div className="text-slate-300 text-sm leading-relaxed whitespace-pre-line prose prose-invert max-w-none">
               {expertTip}
@@ -252,7 +281,7 @@ const App: React.FC = () => {
 
           <div className="bg-slate-900 border border-slate-700 rounded-xl flex-1 flex flex-col overflow-hidden shadow-2xl">
             <div className="px-4 py-2 border-b border-slate-700 bg-slate-800 flex justify-between items-center">
-              <h3 className="text-xs font-mono text-slate-400 uppercase font-bold tracking-widest">System Console</h3>
+              <h3 className="text-xs font-mono text-slate-400 uppercase font-bold tracking-widest">{t.secConsole}</h3>
               <div className="flex gap-1.5">
                 <div className={`w-2 h-2 rounded-full ${isPaused ? 'bg-amber-500 animate-pulse' : 'bg-red-500/50'}`}></div>
                 <div className="w-2 h-2 rounded-full bg-yellow-500/50"></div>
@@ -260,7 +289,7 @@ const App: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2 font-mono text-[11px]">
-              {logs.length === 0 && <p className="text-slate-600 italic">Ready for simulation...</p>}
+              {logs.length === 0 && <p className="text-slate-600 italic">{t.consoleReady}</p>}
               {logs.map(log => (
                 <div key={log.id} className="flex gap-3">
                   <span className="text-slate-600 shrink-0">{log.timestamp}</span>

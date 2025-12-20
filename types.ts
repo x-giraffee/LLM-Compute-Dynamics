@@ -5,6 +5,8 @@ export enum SimulationMode {
   INFERENCE = 'INFERENCE'
 }
 
+export type Language = 'en' | 'zh';
+
 export interface GpuMetrics {
   timestamp: number;
   vramUsed: number; // in GB

@@ -1,12 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { SimulationMode } from '../types';
-
-interface Token {
-  id: string;
-  text: string;
-  color: string;
-}
+import { SimulationMode, Language } from '../types';
+import { TRANSLATIONS } from '../constants';
 
 interface NeuralNetVisProps {
   mode: SimulationMode;
@@ -14,10 +9,12 @@ interface NeuralNetVisProps {
   isPaused: boolean;
   inputTokens: string[];
   outputTokens: string[];
+  lang: Language;
 }
 
-const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, inputTokens, outputTokens }) => {
+const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, inputTokens, outputTokens, lang }) => {
   const [pulse, setPulse] = useState(0);
+  const t = TRANSLATIONS[lang];
 
   useEffect(() => {
     if (isPaused) return;
@@ -38,15 +35,15 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
         <div>
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full animate-pulse`} style={{ backgroundColor: accentColor }}></span>
-            Transformer Engine Visualization
+            {t.visTitle}
           </h3>
           <p className="text-[10px] text-slate-500 mt-1 font-mono uppercase">
-            Architecture: 70B Decoder-Only Transformer | Flash-Attention v2 Enabled
+            {t.visSubtitle}
           </p>
         </div>
         {isPaused && (
           <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/50 rounded text-amber-500 text-[10px] font-bold animate-pulse">
-            PIPELINE STALLED (PAUSED)
+            {t.pipelineStalled}
           </div>
         )}
       </div>
@@ -54,7 +51,7 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
       <div className="flex-1 flex items-center justify-between gap-4 mt-4 relative">
         {/* Input Tokens Area */}
         <div className="w-1/4 h-full flex flex-col justify-center gap-2">
-          <h4 className="text-[10px] text-slate-500 font-bold uppercase text-center mb-2">Input Context Window</h4>
+          <h4 className="text-[10px] text-slate-500 font-bold uppercase text-center mb-2">{t.inputContext}</h4>
           <div className="flex flex-wrap gap-1 justify-center content-center max-h-[300px] overflow-hidden">
             {inputTokens.map((token, idx) => (
               <div 
@@ -64,7 +61,7 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
                 {token}
               </div>
             ))}
-            {inputTokens.length === 0 && <div className="text-slate-700 text-[10px] italic">No input data...</div>}
+            {inputTokens.length === 0 && <div className="text-slate-700 text-[10px] italic">{t.noInput}</div>}
           </div>
         </div>
 
@@ -83,7 +80,7 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
                 }}
               >
                 <span className="text-[8px] text-slate-600 font-mono uppercase tracking-tighter">
-                  Block {i + 1}
+                  {t.block} {i + 1}
                 </span>
                 {/* Internal data flow lines */}
                 {mode !== SimulationMode.IDLE && !isPaused && (
@@ -107,8 +104,8 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
 
           {/* Model Labels */}
           <div className="mt-4 text-center">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest block">LLM CORE ENGINE</span>
-            <span className="text-[8px] text-slate-600 uppercase">Multi-Head Attention + FFN</span>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest block">{t.coreEngine}</span>
+            <span className="text-[8px] text-slate-600 uppercase">{t.subEngine}</span>
           </div>
 
           {/* Visualizing Data Flow Arrows */}
@@ -133,7 +130,7 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
                 <path d="M 180 160 Q 150 160 50 160" fill="none" stroke="#f43f5e" strokeWidth="1" strokeDasharray="4 4">
                    <animate attributeName="stroke-dashoffset" from="0" to="40" dur="1s" repeatCount="indefinite" />
                 </path>
-                <text x="80" y="175" className="fill-rose-500/80 text-[8px] font-mono">BACKPROPAGATION</text>
+                <text x="80" y="175" className="fill-rose-500/80 text-[8px] font-mono">{t.backprop}</text>
               </>
             )}
           </svg>
@@ -142,16 +139,16 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
         {/* Output Area */}
         <div className="w-1/4 h-full flex flex-col justify-center gap-2">
           <h4 className="text-[10px] text-slate-500 font-bold uppercase text-center mb-2">
-            {mode === SimulationMode.TRAINING ? 'Loss / Targets' : 'Output Sequence'}
+            {mode === SimulationMode.TRAINING ? t.lossTargets : t.outputSeq}
           </h4>
           <div className="flex flex-col gap-1 items-center max-h-[300px] overflow-hidden">
             {mode === SimulationMode.TRAINING ? (
               <div className="flex flex-col items-center gap-3">
                  <div className="px-4 py-2 bg-rose-500/20 border border-rose-500/40 rounded text-[10px] text-rose-300 font-bold uppercase tracking-widest text-center">
-                    Loss Signal
+                    {t.lossSignal}
                  </div>
                  <div className="text-[8px] text-slate-600 font-mono text-center">
-                    Updates applied to weights via AdamW Optimizer
+                    {t.lossDesc}
                  </div>
               </div>
             ) : (
@@ -164,8 +161,8 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
                 </div>
               ))
             )}
-            {mode === SimulationMode.IDLE && <div className="text-slate-700 text-[10px] italic">Waiting for output...</div>}
-            {mode === SimulationMode.INFERENCE && outputTokens.length === 0 && <div className="text-slate-700 text-[10px] italic">Generating...</div>}
+            {mode === SimulationMode.IDLE && <div className="text-slate-700 text-[10px] italic">{t.waitingOutput}</div>}
+            {mode === SimulationMode.INFERENCE && outputTokens.length === 0 && <div className="text-slate-700 text-[10px] italic">{t.generating}</div>}
           </div>
         </div>
       </div>
@@ -174,16 +171,16 @@ const NeuralNetVis: React.FC<NeuralNetVisProps> = ({ mode, progress, isPaused, i
       <div className="absolute bottom-4 left-6 flex gap-6 items-center">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-blue-500 rounded-sm border border-blue-400/50"></div>
-          <span className="text-[10px] text-slate-500 font-bold uppercase">Weights (7B Params)</span>
+          <span className="text-[10px] text-slate-500 font-bold uppercase">{t.legendWeights}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-emerald-500 rounded-sm border border-emerald-400/50"></div>
-          <span className="text-[10px] text-slate-500 font-bold uppercase">Activations / Tokens</span>
+          <span className="text-[10px] text-slate-500 font-bold uppercase">{t.legendActivations}</span>
         </div>
         {mode === SimulationMode.TRAINING && (
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 bg-rose-500 rounded-sm border border-rose-400/50"></div>
-            <span className="text-[10px] text-slate-500 font-bold uppercase">Gradients</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase">{t.legendGradients}</span>
           </div>
         )}
       </div>

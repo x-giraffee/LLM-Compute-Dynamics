@@ -4,17 +4,19 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   AreaChart, Area 
 } from 'recharts';
-import { GpuMetrics, SimulationMode } from '../types';
-import { GPU_SPECS } from '../constants';
+import { GpuMetrics, SimulationMode, Language } from '../types';
+import { GPU_SPECS, TRANSLATIONS } from '../constants';
 
 interface GpuDashboardProps {
   history: GpuMetrics[];
   current: GpuMetrics;
   mode: SimulationMode;
+  lang: Language;
 }
 
-const GpuDashboard: React.FC<GpuDashboardProps> = ({ history, current, mode }) => {
+const GpuDashboard: React.FC<GpuDashboardProps> = ({ history, current, mode, lang }) => {
   const showTaskMetric = mode !== SimulationMode.IDLE;
+  const t = TRANSLATIONS[lang];
   
   return (
     <div className="space-y-4">
@@ -22,7 +24,7 @@ const GpuDashboard: React.FC<GpuDashboardProps> = ({ history, current, mode }) =
         {/* VRAM Usage */}
         <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-slate-400 font-medium uppercase text-xs tracking-wider">VRAM Usage</h3>
+            <h3 className="text-slate-400 font-medium uppercase text-xs tracking-wider">{t.vramUsage}</h3>
             <span className="text-blue-400 font-bold text-lg">{current.vramUsed.toFixed(1)} / {GPU_SPECS.VRAM_TOTAL} GB</span>
           </div>
           <div className="h-40">
@@ -51,7 +53,7 @@ const GpuDashboard: React.FC<GpuDashboardProps> = ({ history, current, mode }) =
         {/* Compute Utilization */}
         <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-slate-400 font-medium uppercase text-xs tracking-wider">Compute Utilization</h3>
+            <h3 className="text-slate-400 font-medium uppercase text-xs tracking-wider">{t.computeUtil}</h3>
             <span className="text-emerald-400 font-bold text-lg">{current.computeUtil.toFixed(1)}%</span>
           </div>
           <div className="h-40">
@@ -77,7 +79,7 @@ const GpuDashboard: React.FC<GpuDashboardProps> = ({ history, current, mode }) =
         <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-slate-400 font-medium uppercase text-xs tracking-wider">
-              {mode === SimulationMode.TRAINING ? 'Training Loss Convergence' : 'Inference Throughput (TPS)'}
+              {mode === SimulationMode.TRAINING ? t.trainingLossChart : t.inferenceTpsChart}
             </h3>
             <span className={mode === SimulationMode.TRAINING ? 'text-rose-400 font-bold text-lg' : 'text-amber-400 font-bold text-lg'}>
               {mode === SimulationMode.TRAINING 
